@@ -152,6 +152,22 @@ impl Builder {
             connect_timeout: DEFAULT_CONNECT_TIMEOUT,
         }
     }
+    pub fn as_credentials(&self) -> anyhow::Result<Credentials> {
+        let (host, port) = match &self.addr {
+            Addr(AddrImpl::Tcp(host, port)) => (host, port),
+            Addr(AddrImpl::Unix(_)) => {
+                anyhow::bail!("Cannot generate credentials for UNIX socket.");
+            }
+        };
+        Ok(Credentials {
+            host: Some(host.into()),
+            port: port.clone(),
+            user: self.user.clone(),
+            password: self.password.clone(),
+            database: Some(self.database.clone()),
+            tls_certdata: None
+        })
+    }
     pub fn get_addr(&self) -> &Addr {
         &self.addr
     }
