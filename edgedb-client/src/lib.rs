@@ -1,4 +1,5 @@
 mod builder;
+mod byte_stream;
 mod sealed;
 mod features;
 pub mod errors;

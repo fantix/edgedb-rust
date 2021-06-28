@@ -10,7 +10,6 @@ use async_std::prelude::StreamExt;
 use async_std::future::{timeout, pending};
 use async_std::io::prelude::WriteExt;
 use async_std::io::ReadExt;
-use async_listen::ByteStream;
 use bytes::{Bytes, BytesMut};
 use typemap::TypeMap;
 
@@ -25,6 +24,7 @@ use edgedb_protocol::queryable::{Queryable, Decoder};
 use edgedb_protocol::value::Value;
 use edgedb_protocol::descriptors::OutputTypedesc;
 
+use crate::byte_stream::ByteStream;
 use crate::server_params::ServerParam;
 use crate::reader::{self, QueryableDecoder, QueryResponse, Reader};
 use crate::errors::NoResultExpected;

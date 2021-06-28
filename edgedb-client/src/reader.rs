@@ -10,7 +10,6 @@ use std::task::{Poll, Context};
 
 use async_std::io::Read as AsyncRead;
 use async_std::stream::{Stream, StreamExt};
-use async_listen::ByteStream;
 use bytes::{Bytes, BytesMut, BufMut};
 use snafu::{Snafu, ResultExt, Backtrace};
 
@@ -21,6 +20,7 @@ use edgedb_protocol::queryable::{Queryable, Decoder};
 use edgedb_protocol::codec::Codec;
 use edgedb_protocol::value::Value;
 
+use crate::byte_stream::ByteStream;
 use crate::client;
 
 

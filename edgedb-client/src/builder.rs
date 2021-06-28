@@ -10,7 +10,7 @@ use async_std::fs;
 use async_std::future::Future;
 use async_std::net::TcpStream;
 use async_std::task::sleep;
-use async_listen::ByteStream;
+use async_tls::TlsConnector;
 use bytes::{Bytes, BytesMut};
 use rand::{thread_rng, Rng};
 use scram::ScramClient;
@@ -21,6 +21,7 @@ use edgedb_protocol::client_message::{ClientMessage, ClientHandshake};
 use edgedb_protocol::server_message::{ServerMessage, Authentication};
 use edgedb_protocol::server_message::{TransactionState, ServerHandshake};
 
+use crate::byte_stream::ByteStream;
 use crate::client::{Connection, Sequence};
 use crate::credentials::Credentials;
 use crate::errors::PasswordRequired;
@@ -271,7 +272,9 @@ impl Builder {
         let sock = match &self.addr {
             Addr(AddrImpl::Tcp(host, port)) => {
                 let conn = TcpStream::connect(&(&host[..], *port)).await?;
-                ByteStream::new_tcp_detached(conn)
+                let connector = TlsConnector::default();
+                let tls_conn = connector.connect("127.0.0.1", conn).await?;
+                ByteStream::new_tls_detached(tls_conn)
             }
             Addr(AddrImpl::Unix(path)) => {
                 #[cfg(windows)] {
