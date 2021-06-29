@@ -83,8 +83,8 @@ impl ServerCertVerifier for ServerCertificates {
         &self,
         roots: &RootCertStore,
         presented_certs: &[Certificate],
-        dns_name: webpki::DNSNameRef,
-        ocsp_response: &[u8],
+        _dns_name: webpki::DNSNameRef,
+        _ocsp_response: &[u8],
     ) -> Result<ServerCertVerified, TLSError> {
         let (cert, chain, trustroots) = prepare(roots, presented_certs)?;
         let now = try_now()?;
