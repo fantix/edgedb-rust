@@ -4,6 +4,7 @@ use std::str;
 use std::fmt;
 use std::time::{Instant, Duration};
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 
 use anyhow::{self, Context};
 use async_std::fs;
@@ -268,7 +269,7 @@ impl Builder {
         };
         Ok(conn)
     }
-    pub async fn connect_tls(&self, callback: Option<CertificateCallback>) -> anyhow::Result<()> {
+    pub async fn connect_tls(&self, callback: Option<(mpsc::SyncSender<String>, CertificateCallback)>) -> anyhow::Result<()> {
         match &self.addr {
             Addr(AddrImpl::Tcp(host, port)) => {
                 connect_tls(host, port, callback).await?;
@@ -524,13 +525,18 @@ fn from_dsn() {
 fn server_cert() {
     let rv = block_on(async move {
         let bld = Builder::from_dsn("edgedb://localhost:5656").unwrap();
-        bld.connect_tls(Some(|certs: &[Certificate], roots: &mut RootCertStore| {
-            println!("certs: {:?}", certs);
+        let (tx, rx) = mpsc::sync_channel(8);
+        let rv = bld.connect_tls(Some((tx, |certs: &[Certificate], roots: &mut RootCertStore, tx: &mpsc::SyncSender<String>| {
+            if let Err(_) = tx.send(format!("{:?}", certs[0].0)) {
+                return false;
+            }
             match roots.add(&certs[0]) {
                 Ok(_) => true,
                 Err(_) => false,
             }
-        })).await
+        }))).await;
+        println!("{:?}", rx.recv()?);
+        rv
     });
     println!("{:?}", rv);
 }

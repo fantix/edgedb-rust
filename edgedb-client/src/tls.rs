@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, mpsc};
 
 use async_tls::TlsConnector;
 use rustls::{ClientConfig, ServerCertVerifier, ServerCertVerified, TLSError, RootCertStore,
@@ -64,21 +64,21 @@ fn try_now() -> Result<webpki::Time, TLSError> {
         .map_err(|_| TLSError::FailedToGetCurrentTime)
 }
 
-pub type CertificateCallback = fn(&[Certificate], &mut RootCertStore) -> bool;
+pub type CertificateCallback = fn(&[Certificate], &mut RootCertStore, &mpsc::SyncSender<String>) -> bool;
 
-pub struct ServerCertificates {
-    callback: Option<CertificateCallback>,
+struct CertPeakVerifier {
+    callback: Option<(mpsc::SyncSender<String>, CertificateCallback)>,
 }
 
-impl ServerCertificates {
-    pub fn new(callback: Option<CertificateCallback>) -> Self {
-        ServerCertificates {
+impl CertPeakVerifier {
+    pub fn new(callback: Option<(mpsc::SyncSender<String>, CertificateCallback)>) -> Self {
+        CertPeakVerifier {
             callback,
         }
     }
 }
 
-impl ServerCertVerifier for ServerCertificates {
+impl ServerCertVerifier for CertPeakVerifier {
     fn verify_server_cert(
         &self,
         roots: &RootCertStore,
@@ -94,13 +94,13 @@ impl ServerCertVerifier for ServerCertificates {
             &chain,
             now,
         ) {
-            if let Some(callback) = self.callback {
+            if let Some((sender, callback)) = &self.callback {
                 loop {
                     let mut new_roots = RootCertStore::empty();
                     for root in &roots.roots {
                         new_roots.roots.push(root.clone());
                     }
-                    if callback(presented_certs, &mut new_roots) {
+                    if callback(presented_certs, &mut new_roots, &sender) {
                         let (cert, chain, trustroots) = prepare(&new_roots, presented_certs)?;
                         let now = try_now()?;
                         match cert.verify_is_valid_tls_server_cert(
@@ -129,11 +129,11 @@ impl ServerCertVerifier for ServerCertificates {
     }
 }
 
-pub async fn connect_tls(host: &String, port: &u16, callback: Option<CertificateCallback>)
+pub async fn connect_tls(host: &String, port: &u16, callback: Option<(mpsc::SyncSender<String>, CertificateCallback)>)
     -> anyhow::Result<TlsStream<TcpStream>>
 {
     let conn = TcpStream::connect(&(&host[..], *port)).await?;
-    let certs = Arc::new(ServerCertificates::new(callback));
+    let certs = Arc::new(CertPeakVerifier::new(callback));
     let mut config = ClientConfig::new();
     config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
     config.dangerous().set_certificate_verifier(certs);
