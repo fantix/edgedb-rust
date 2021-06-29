@@ -21,3 +21,7 @@ log = "0.4.8"
 humantime-serde = "1.0.0"
 rand = "0.8"
 url = "2.1.1"
+rustls = { version = "0.19.1", features = ["dangerous_configuration"] }
+async-tls = "0.11.0"
+webpki = "0.21.0"
+webpki-roots = "0.21.0"

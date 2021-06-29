@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io;
 use std::str;
+use std::sync::Arc;
 use std::fmt;
 use std::time::{Instant, Duration};
 use std::path::{Path, PathBuf};
@@ -10,9 +11,11 @@ use async_std::fs;
 use async_std::future::Future;
 use async_std::net::TcpStream;
 use async_std::task::sleep;
+#[cfg(test)] use async_std::task::block_on;
 use async_listen::ByteStream;
 use bytes::{Bytes, BytesMut};
 use rand::{thread_rng, Rng};
+use rustls::{Certificate, RootCertStore};
 use scram::ScramClient;
 use serde_json::from_slice;
 use typemap::TypeMap;
@@ -27,6 +30,7 @@ use crate::errors::PasswordRequired;
 use crate::features::ProtocolVersion;
 use crate::reader::ReadError;
 use crate::server_params::PostgresAddress;
+use crate::tls::{connect_tls, ServerCertificates};
 
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DEFAULT_WAIT: Duration = Duration::from_secs(30);
@@ -264,6 +268,25 @@ impl Builder {
             }
         };
         Ok(conn)
+    }
+    pub async fn connect_tls(&self) -> anyhow::Result<()> {
+        let (host, port) = match &self.addr {
+            Addr(AddrImpl::Tcp(host, port)) => {
+                let conn = connect_tls(
+                    host, port, Some(|certs: &[Certificate], roots: &mut RootCertStore| {
+                        println!("certs: {:?}", certs);
+                        roots.add(&certs[0]);
+                        true
+                    })).await?;
+                println!("{}:{}", host, port);
+                (host, port)
+            },
+            Addr(AddrImpl::Unix(path)) => {
+                anyhow::bail!("Using TLS on UNIX socket is not supported.");
+            },
+        };
+
+        Ok(())
     }
     async fn _connect(&self)
         -> anyhow::Result<Connection>
@@ -504,4 +527,13 @@ fn from_dsn() {
     assert_eq!(&bld.user, "edgedb");
     assert_eq!(&bld.database, "edgedb");
     assert_eq!(bld.password, None);
+}
+
+#[test]
+fn server_cert() {
+    let rv = block_on(async move {
+        let bld = Builder::from_dsn("edgedb://localhost:5656").unwrap();
+        bld.connect_tls().await
+    });
+    println!("{:?}", rv);
 }

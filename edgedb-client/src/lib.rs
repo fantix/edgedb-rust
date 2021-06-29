@@ -1,6 +1,7 @@
 mod builder;
 mod sealed;
 mod features;
+mod tls;
 pub mod errors;
 pub mod reader;
 pub mod client;
